@@ -1,3 +1,24 @@
-git clone --recurse-submodules https://github.com/willfaust/Madeira.git
-cd Madeira
-./scripts/build-ipa.sh   # produces dist/Madeira.ipa
+name: Creator Script Automation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-creator-build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code Natively
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Forces Git to fetch Wine/FEX components automatically
+
+      - name: Execute Creator Command Sequence
+        run: |
+          chmod +x ./scripts/build-ipa.sh
+          ./scripts/build-ipa.sh
+
+      - name: Upload Finished Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Madeira-App
+          path: dist/Madeira.ipa
