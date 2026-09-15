@@ -1,24 +1,36 @@
-name: Creator Script Automation
+name: Ultimate Unsigned Build
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-creator-build:
+  build:
     runs-on: macos-latest
     steps:
-      - name: Checkout Code Natively
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Forces Git to fetch Wine/FEX components automatically
+          submodules: recursive # Automatically downloads Wine/FEX submodules cleanly
 
-      - name: Execute Creator Command Sequence
+      - name: Compile Unsigned Workspace
         run: |
-          chmod +x ./scripts/build-ipa.sh
-          ./scripts/build-ipa.sh
+          xcodebuild clean build -workspace Madeira.xcworkspace \
+                                 -scheme Madeira \
+                                 -configuration Release \
+                                 -sdk iphoneos \
+                                 CODE_SIGNING_ALLOWED=NO \
+                                 CODE_SIGNING_REQUIRED=NO \
+                                 CODE_SIGN_IDENTITY=""
 
-      - name: Upload Finished Artifact
+      - name: Package Manual IPA
+        run: |
+          mkdir -p dist/Payload
+          cp -R build/Release-iphoneos/Madeira.app dist/Payload/
+          cd dist
+          zip -r Madeira.ipa Payload/
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Madeira-App
+          name: Madeira-Unsigned
           path: dist/Madeira.ipa
