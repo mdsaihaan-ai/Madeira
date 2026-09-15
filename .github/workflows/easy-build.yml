@@ -1,4 +1,4 @@
-name: Ultimate Unsigned Build
+name: Pure Unsigned Build for SideStore
 
 on:
   workflow_dispatch:
@@ -10,27 +10,34 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Automatically downloads Wine/FEX submodules cleanly
+          submodules: recursive # Automatically pulls down nested Wine/FEX submodules
 
-      - name: Compile Unsigned Workspace
+      - name: Clean Output Directories
         run: |
-          xcodebuild clean build -workspace Madeira.xcworkspace \
+          rm -rf build dist
+          mkdir -p dist/Payload
+
+      - name: Raw Compile
+        run: |
+          # Step directly into the app folder where the Xcode project lives
+          xcodebuild clean build -project app/Madeira.xcodeproj \
                                  -scheme Madeira \
                                  -configuration Release \
                                  -sdk iphoneos \
                                  CODE_SIGNING_ALLOWED=NO \
                                  CODE_SIGNING_REQUIRED=NO \
-                                 CODE_SIGN_IDENTITY=""
+                                 CODE_SIGN_IDENTITY="" \
+                                 PROVISIONING_PROFILE_SPECIFIER=""
 
-      - name: Package Manual IPA
+      - name: Assemble Custom Payload Container
         run: |
-          mkdir -p dist/Payload
-          cp -R build/Release-iphoneos/Madeira.app dist/Payload/
+          # Grabs the compiled .app layout folder from the Xcode output directory
+          cp -R ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Release-iphoneos/Madeira.app dist/Payload/ || cp -R build/Release-iphoneos/Madeira.app dist/Payload/
           cd dist
-          zip -r Madeira.ipa Payload/
+          zip -vr Madeira.ipa Payload/
 
-      - name: Upload Artifact
+      - name: Upload Unsigned IPA Package
         uses: actions/upload-artifact@v4
         with:
-          name: Madeira-Unsigned
+          name: Madeira-For-SideStore
           path: dist/Madeira.ipa
