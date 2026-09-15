@@ -1,45 +1,50 @@
-name: Manual Unsigned Madeira Build
+name: Build Madeira (Unsigned IPA)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Allows you to manually trigger the build with a button click
 
 jobs:
-  build-ipa:
-    runs-on: macos-latest
+  build:
+    name: Compile App Binary
+    runs-on: macos-14 # Uses Apple's remote M-series cloud servers
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout Repository Code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Downloads the custom Wine and FEX forks safely
+          submodules: recursive # Automatically downloads the hidden Wine and FEX-Emu sub-folders
 
-      - name: Force Update Git Submodules
+      - name: Set up Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Configure CMake Build Target
         run: |
-          git submodule sync
-          git submodule update --init --recursive --force
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_NAME=iOS
 
-      - name: Clean Project Build Cache
+      - name: Compile and Archive App Binary (No Code-Sign Mode)
         run: |
-          xcodebuild clean -project app/Madeira.xcodeproj -scheme Madeira || true
+          cd build
+          xcodebuild archive \
+            -workspace *.xcworkspace 2>/dev/null || xcodebuild archive -project *.xcodeproj \
+            -scheme "Madeira" \
+            -destination "generic/platform=iOS" \
+            -archivePath ./Madeira.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
 
-      - name: Compile App Binary
+      - name: Package Binary into Sideloadable IPA Structure
         run: |
-          xcodebuild build -project app/Madeira.xcodeproj \
-                           -scheme Madeira \
-                           -sdk iphoneos \
-                           -configuration Release \
-                           CODE_SIGNING_ALLOWED=NO \
-                           CODE_SIGNING_REQUIRED=NO \
-                           CODE_SIGN_IDENTITY=""
+          cd build
+          mkdir -p Payload
+          cp -r ./Madeira.xcarchive/Products/Applications/*.app ./Payload/
+          zip -r Madeira.ipa Payload
 
-      - name: Package App Bundle into IPA
-        run: |
-          mkdir -p dist/Payload
-          cp -R build/Release-iphoneos/Madeira.app dist/Payload/
-          cd dist
-          zip -r Madeira.ipa Payload/
-
-      - name: Upload Finished IPA
-        uses: actions/upload-artifact@v4
+      - name: Upload Finished IPA Package to GitHub
+        uses: actions/artifacts@v4
         with:
-          name: Madeira-App
-          path: dist/Madeira.ipa
+          name: Madeira-Unsigned-IPA
+          path: build/Madeira.ipa
+          if-no-files-found: error
