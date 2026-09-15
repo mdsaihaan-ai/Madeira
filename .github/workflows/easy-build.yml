@@ -1,4 +1,4 @@
-name: Easy Unsigned Madeira IPA Build
+name: Manual Unsigned Madeira Build
 
 on:
   workflow_dispatch:
@@ -10,12 +10,33 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: recursive # Downloads the custom Wine and FEX forks safely
 
-      - name: Run Developer Build Script
+      - name: Force Update Git Submodules
         run: |
-          chmod +x ./scripts/build-ipa.sh
-          ./scripts/build-ipa.sh
+          git submodule sync
+          git submodule update --init --recursive --force
+
+      - name: Clean Project Build Cache
+        run: |
+          xcodebuild clean -project app/Madeira.xcodeproj -scheme Madeira || true
+
+      - name: Compile App Binary
+        run: |
+          xcodebuild build -project app/Madeira.xcodeproj \
+                           -scheme Madeira \
+                           -sdk iphoneos \
+                           -configuration Release \
+                           CODE_SIGNING_ALLOWED=NO \
+                           CODE_SIGNING_REQUIRED=NO \
+                           CODE_SIGN_IDENTITY=""
+
+      - name: Package App Bundle into IPA
+        run: |
+          mkdir -p dist/Payload
+          cp -R build/Release-iphoneos/Madeira.app dist/Payload/
+          cd dist
+          zip -r Madeira.ipa Payload/
 
       - name: Upload Finished IPA
         uses: actions/upload-artifact@v4
