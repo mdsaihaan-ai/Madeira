@@ -1,43 +1,32 @@
-name: Pure Unsigned Build for SideStore
+name: Total Automated Compilation
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: macos-latest
+  compile-ipa:
+    runs-on: macos-14
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive # Automatically pulls down nested Wine/FEX submodules
-
-      - name: Clean Output Directories
+      - name: Force Clean Workspace Setup
         run: |
-          rm -rf build dist
-          mkdir -p dist/Payload
+          mkdir -p workspace-root
+          cd workspace-root
+          git clone --recurse-submodules https://github.com
+          cd Madeira
+          chmod +x ./scripts/build-ipa.sh
+          ./scripts/build-ipa.sh
+        env:
+          CODE_SIGNING_ALLOWED: NO
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGN_IDENTITY: ""
 
-      - name: Raw Compile
+      - name: Find and Package Artifact
         run: |
-          # Step directly into the app folder where the Xcode project lives
-          xcodebuild clean build -project app/Madeira.xcodeproj \
-                                 -scheme Madeira \
-                                 -configuration Release \
-                                 -sdk iphoneos \
-                                 CODE_SIGNING_ALLOWED=NO \
-                                 CODE_SIGNING_REQUIRED=NO \
-                                 CODE_SIGN_IDENTITY="" \
-                                 PROVISIONING_PROFILE_SPECIFIER=""
+          mkdir -p output
+          find . -name "Madeira.ipa" -exec cp {} output/ \;
 
-      - name: Assemble Custom Payload Container
-        run: |
-          # Grabs the compiled .app layout folder from the Xcode output directory
-          cp -R ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Release-iphoneos/Madeira.app dist/Payload/ || cp -R build/Release-iphoneos/Madeira.app dist/Payload/
-          cd dist
-          zip -vr Madeira.ipa Payload/
-
-      - name: Upload Unsigned IPA Package
+      - name: Publish Finished IPA Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: Madeira-For-SideStore
-          path: dist/Madeira.ipa
+          name: Madeira-Package
+          path: output/*.ipa
