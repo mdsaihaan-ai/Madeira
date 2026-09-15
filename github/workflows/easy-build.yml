@@ -1,0 +1,33 @@
+name: Easy Madeira IPA Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Apple Certificates
+        run: |
+          echo "${{ secrets.BUILD_CERTIFICATE_BASE64 }}" | base64 --decode --output $RUNNER_TEMP/cert.p12
+          echo "${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}" | base64 --decode --output $RUNNER_TEMP/profile.mobileprovision
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" $RUNNER_TEMP/app.keychain
+          security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/app.keychain -P "${{ secrets.P12_PASSWORD }}" -A
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $RUNNER_TEMP/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Run Developer Build Script
+        run: |
+          chmod +x ./scripts/build-ipa.sh
+          ./scripts/build-ipa.sh
+
+      - name: Upload Finished IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Madeira-App
+          path: dist/Madeira.ipa
